@@ -11,7 +11,11 @@ import time
 # NAZWA = "Kiedy Odjade"
 
 API_KEY = "641871fa-09f4-4925-8352-260938471590"
-WAWA_API_BUS_JSON = "https://api.um.warszawa.pl/api/action/busestrams_get/?resource_id=f2e5503e-927d-4ad3-9500-4ab9e55deb59&apikey=" + API_KEY + "&type=1"
+WAWA_API_BUS_JSON = (
+    "https://api.um.warszawa.pl/api/action/busestrams_get/?resource_id=f2e5503e-927d-4ad3-9500-4ab9e55deb59&apikey="
+    + API_KEY
+    + "&type=1"
+)
 
 CENTER_START = [52.23181538050862, 21.006035781379524]
 ZOOM_START = 12
@@ -27,7 +31,7 @@ if "markers" not in st.session_state:
 
 if "last_api_call" not in st.session_state:
     st.session_state.last_api_call = 0
-if 'map_refresh_counter' not in st.session_state:
+if "map_refresh_counter" not in st.session_state:
     st.session_state.map_refresh_counter = 0
 if "last_json" not in st.session_state:
     st.session_state.last_json = {}
@@ -42,14 +46,14 @@ if "selected_tram" not in st.session_state:
 
 # get json
 async def fetch(session, url):
-        try:
-            async with session.get(url) as response:
-                result = await response.json()
-                print("API call date: ", datetime.now())
-                st.session_state.last_api_call = datetime.now()
-                return result
-        except Exception:
-            return {}
+    try:
+        async with session.get(url) as response:
+            result = await response.json()
+            print("API call date: ", datetime.now())
+            st.session_state.last_api_call = datetime.now()
+            return result
+    except Exception:
+        return {}
 
 
 # convert json to pandas DataFrame + convert "Time" column for future calculation
@@ -71,9 +75,11 @@ def json_to_pandas(json, last_json):
 @st.cache
 def filter_data_by_time(wawa_bus_array):
     current_date_and_time = datetime.now()
-    #wawa_bus_array_filter_time = abs(wawa_bus_array["Time"] - current_date_and_time)
-    wawa_bus_array_filtered = wawa_bus_array.loc[wawa_bus_array["Time"] > (current_date_and_time - timedelta(minutes=5))]
-    return(wawa_bus_array_filtered)
+    # wawa_bus_array_filter_time = abs(wawa_bus_array["Time"] - current_date_and_time)
+    wawa_bus_array_filtered = wawa_bus_array.loc[
+        wawa_bus_array["Time"] > (current_date_and_time - timedelta(minutes=5))
+    ]
+    return wawa_bus_array_filtered
 
 
 # add markers to session_state for interactive map
@@ -83,10 +89,19 @@ def markers_to_session(wawa_bus_array_filtered):
     st.session_state.markers = []
 
     for ind, row in wawa_bus_array_filtered.iterrows():
-        st.session_state.markers.append( folium.Marker(  [row["Lat"], row["Lon"]],
-                        popup=row["Lines"] + "(" + row["VehicleNumber"] + "/" + row["Brigade"] + ")",
-                        icon=folium.Icon(color="green", icon="bus", prefix="fa")))
-    return(True)
+        st.session_state.markers.append(
+            folium.Marker(
+                [row["Lat"], row["Lon"]],
+                popup=row["Lines"]
+                + "("
+                + row["VehicleNumber"]
+                + "/"
+                + row["Brigade"]
+                + ")",
+                icon=folium.Icon(color="green", icon="bus", prefix="fa"),
+            )
+        )
+    return True
 
 
 async def main():
@@ -102,7 +117,7 @@ async def main():
     async with aiohttp.ClientSession() as session:
         data = await fetch(session, WAWA_API_BUS_JSON)
         st.session_state.map_refresh_counter += 1
-        
+
         if data:
             pandas_bus = json_to_pandas(data, st.session_state.last_json)
             st.session_state.last_json = data
@@ -113,31 +128,45 @@ async def main():
     pandas_bus = filter_data_by_time(pandas_bus)
 
     # multiselect batton -> saving selection in session_state
-    st.session_state.selected_bus = st.multiselect(label="Wybierz linie BUS", options=pandas_bus["Lines"].unique(), default=st.session_state.selected_bus)
+    st.session_state.selected_bus = st.multiselect(
+        label="Wybierz linie BUS",
+        options=pandas_bus["Lines"].unique(),
+        default=st.session_state.selected_bus,
+    )
 
     # use only selected bus lines -> if 0 selected show all markers
-    if(len(st.session_state.selected_bus) > 0):
+    if len(st.session_state.selected_bus) > 0:
         pandas_bus = pandas_bus[pandas_bus["Lines"].isin(st.session_state.selected_bus)]
 
-    # add markers to state_session 
+    # add markers to state_session
     markers_done = markers_to_session(pandas_bus)
 
-    # map initialization 
+    # map initialization
     m = folium.Map(location=CENTER_START, zoom_start=8)
     fg = folium.FeatureGroup(name="Markers")
     for marker in st.session_state.markers:
         fg.add_child(marker)
 
-    st.write("API last call -> ", st.session_state.last_api_call, " | API calls in this session: ", st.session_state.map_refresh_counter, " | API call ERRORS: ", st.session_state.json_errors)
+    st.write(
+        "API last call -> ",
+        st.session_state.last_api_call,
+        " | API calls in this session: ",
+        st.session_state.map_refresh_counter,
+        " | API call ERRORS: ",
+        st.session_state.json_errors,
+    )
 
     # map render
-    map_data = st_folium(m, center=st.session_state.center,
-                        zoom=st.session_state.zoom,
-                        key="new",
-                        feature_group_to_add=fg,
-                        height=400,
-                        width=700,)
-    #st.write(map_data)
+    map_data = st_folium(
+        m,
+        center=st.session_state.center,
+        zoom=st.session_state.zoom,
+        key="new",
+        feature_group_to_add=fg,
+        height=400,
+        width=700,
+    )
+    # st.write(map_data)
 
     # show table with selected items
     st.write(pandas_bus)
@@ -151,17 +180,14 @@ async def main():
     #     print("STOP")
     #     st.stop()
 
-    if(check_rerun):
+    if check_rerun:
         time.sleep(2)
         st.experimental_rerun()
 
 
 ### --- End of MAIN --- ###
-        
-    
-    
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     loop = asyncio.new_event_loop()
     loop.run_until_complete(main())
