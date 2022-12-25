@@ -10,6 +10,11 @@ import time
 
 # NAZWA = "Kiedy Odjade"
 
+# TODO: add automatic "black"
+# TODO: check "streamlit-server-state" library
+
+
+
 API_KEY = "641871fa-09f4-4925-8352-260938471590"
 WAWA_API_BUS_JSON = (
     "https://api.um.warszawa.pl/api/action/busestrams_get/?resource_id=f2e5503e-927d-4ad3-9500-4ab9e55deb59&apikey="
@@ -61,13 +66,14 @@ async def fetch(session, url):
 def json_to_pandas(json, last_json):
     try:
         pandas_json = pd.json_normalize(json["result"])
+        pandas_json["Time"] = pd.to_datetime(pandas_json["Time"])
     except Exception:
         st.session_state.json_errors += 1
         pandas_json = pd.json_normalize(last_json["result"])
+        pandas_json["Time"] = pd.to_datetime(pandas_json["Time"])
         print(json)
         # return (print(pandas_json)) -> {'result': 'Błędna metoda lub parametry wywołania'}
 
-    pandas_json["Time"] = pd.to_datetime(pandas_json["Time"])
     return pandas_json
 
 
@@ -143,6 +149,8 @@ async def main():
 
     # map initialization
     m = folium.Map(location=CENTER_START, zoom_start=8)
+
+    fg_empty = folium.FeatureGroup(name="Markers")
     fg = folium.FeatureGroup(name="Markers")
     for marker in st.session_state.markers:
         fg.add_child(marker)
