@@ -4,6 +4,7 @@ from streamlit_folium import st_folium, folium_static
 import aiohttp
 import asyncio
 import pandas as pd
+import numpy as np
 from datetime import datetime, timedelta
 import time
 
@@ -14,12 +15,17 @@ import time
 # TODO: check "streamlit-server-state" library
 
 
-
 API_KEY = "641871fa-09f4-4925-8352-260938471590"
 WAWA_API_BUS_JSON = (
     "https://api.um.warszawa.pl/api/action/busestrams_get/?resource_id=f2e5503e-927d-4ad3-9500-4ab9e55deb59&apikey="
     + API_KEY
     + "&type=1"
+)
+
+WAWA_API_TRAM_JSON = (
+    "https://api.um.warszawa.pl/api/action/busestrams_get/?resource_id=f2e5503e-927d-4ad3-9500-4ab9e55deb59&apikey="
+    + API_KEY
+    + "&type=2"
 )
 
 CENTER_START = [52.23181538050862, 21.006035781379524]
@@ -38,15 +44,33 @@ if "last_api_call" not in st.session_state:
     st.session_state.last_api_call = 0
 if "map_refresh_counter" not in st.session_state:
     st.session_state.map_refresh_counter = 0
-if "last_json" not in st.session_state:
-    st.session_state.last_json = {}
+if "last_json_bus" not in st.session_state:
+    st.session_state.last_json_bus = {}
+if "last_json_tram" not in st.session_state:
+    st.session_state.last_json_tram = {}
 if "json_errors" not in st.session_state:
     st.session_state.json_errors = 0
 
-if "selected_bus" not in st.session_state:
-    st.session_state.selected_bus = []
-if "selected_tram" not in st.session_state:
-    st.session_state.selected_tram = []
+if "only_bus" not in st.session_state:
+    st.session_state.only_bus = 0
+if "only_tram" not in st.session_state:
+    st.session_state.only_tram = 0
+
+if "selected_bus_lines" not in st.session_state:
+    st.session_state.selected_bus_lines = []
+if "selected_tram_lines" not in st.session_state:
+    st.session_state.selected_tram_lines = []
+
+
+def ss_flip():
+    if st.session_state.only_bus:
+        if st.session_state.only_tram:
+            st.session_state.only_bus = 0
+            st.session_state.only_tram = 0
+    elif st.session_state.only_tram:
+        if st.session_state.only_bus:
+            st.session_state.only_bus = 0
+            st.session_state.only_tram = 0
 
 
 # get json
@@ -54,7 +78,10 @@ async def fetch(session, url):
     try:
         async with session.get(url) as response:
             result = await response.json()
-            print("API call date: ", datetime.now())
+            print(
+                f"ZTM API call (type='{url[-1]}'): ",
+                datetime.now(),
+            )
             st.session_state.last_api_call = datetime.now()
             return result
     except Exception:
@@ -63,15 +90,29 @@ async def fetch(session, url):
 
 # convert json to pandas DataFrame + convert "Time" column for future calculation
 @st.cache
-def json_to_pandas(json, last_json):
+def json_to_pandas(json, last_json, type):
     try:
         pandas_json = pd.json_normalize(json["result"])
         pandas_json["Time"] = pd.to_datetime(pandas_json["Time"])
+        if type == "bus":
+            st.session_state.last_json_bus = json
+        elif type == "tram":
+            st.session_state.last_json_tram = json
     except Exception:
+        if json["result"] == [] and type == "tram":
+            json_zero = {
+                "Lines": "0",
+                "Lon": 21.006035,
+                "VehicleNumber": "0",
+                "Time": datetime.now(),
+                "Lat": 52.231815,
+                "Brigade": "0",
+            }
+            st.session_state.last_json_tram = json
+            return pd.DataFrame(json_zero, index=[0])
         st.session_state.json_errors += 1
         pandas_json = pd.json_normalize(last_json["result"])
         pandas_json["Time"] = pd.to_datetime(pandas_json["Time"])
-        print(json)
         # return (print(pandas_json)) -> {'result': 'Błędna metoda lub parametry wywołania'}
 
     return pandas_json
@@ -79,22 +120,26 @@ def json_to_pandas(json, last_json):
 
 # get time and filter data from API
 @st.cache
-def filter_data_by_time(wawa_bus_array):
+def filter_data_by_time(wawa_array, marker="bus"):
     current_date_and_time = datetime.now()
-    # wawa_bus_array_filter_time = abs(wawa_bus_array["Time"] - current_date_and_time)
-    wawa_bus_array_filtered = wawa_bus_array.loc[
-        wawa_bus_array["Time"] > (current_date_and_time - timedelta(minutes=5))
-    ]
-    return wawa_bus_array_filtered
+    wawa_array_filtered = wawa_array.loc[
+        wawa_array["Time"] > (current_date_and_time - timedelta(minutes=5))
+    ].copy()
+    wawa_time = abs(wawa_array_filtered["Time"] - current_date_and_time)
+    wawa_time_string = wawa_time.astype("str").str.split().str[-1]
+    wawa_time_string = pd.to_datetime(wawa_time_string)
+    wawa_array_filtered["SinceUpdate"] = wawa_time_string.dt.strftime("%Mm %Ss")
+    wawa_array_filtered["Marker"] = marker
+    return wawa_array_filtered
 
 
 # add markers to session_state for interactive map
 @st.cache
-def markers_to_session(wawa_bus_array_filtered):
-    del st.session_state.markers
+def markers_to_session(wawa_array_filtered, marker_color="white"):
+    # del st.session_state.markers
     st.session_state.markers = []
 
-    for ind, row in wawa_bus_array_filtered.iterrows():
+    for ind, row in wawa_array_filtered.iterrows():
         st.session_state.markers.append(
             folium.Marker(
                 [row["Lat"], row["Lon"]],
@@ -104,48 +149,90 @@ def markers_to_session(wawa_bus_array_filtered):
                 + "/"
                 + row["Brigade"]
                 + ")",
-                icon=folium.Icon(color="green", icon="bus", prefix="fa"),
+                icon=folium.Icon(color=marker_color, icon=row["Marker"], prefix="fa"),
             )
         )
     return True
 
 
+# main with logic
 async def main():
     st.set_page_config(page_title="Kiedy Odjade", page_icon="🚌")
 
     st.title("Kiedy Odjade / When I'm Gone")
 
-    check_rerun = st.checkbox("Live (2s)")
     # total_stop = st.checkbox("Total Stop")
+    pandas_all = 0
     pandas_bus = 0
+    pandas_tram = 0
+
+    st.session_state.map_refresh_counter += 1
 
     # get json and convert to pandas DataFrame
     async with aiohttp.ClientSession() as session:
-        data = await fetch(session, WAWA_API_BUS_JSON)
-        st.session_state.map_refresh_counter += 1
+        data_bus = await fetch(session, WAWA_API_BUS_JSON)
+        data_tram = await fetch(session, WAWA_API_TRAM_JSON)
 
-        if data:
-            pandas_bus = json_to_pandas(data, st.session_state.last_json)
-            st.session_state.last_json = data
+        if data_bus:
+            pandas_bus = json_to_pandas(data_bus, st.session_state.last_json_bus, "bus")
+        else:
+            st.error("Error")
+
+        if data_tram:
+            pandas_tram = json_to_pandas(data_tram, st.session_state.last_json_tram, "tram")
         else:
             st.error("Error")
 
     # filter data to show markers with "Time" > now - 5min
-    pandas_bus = filter_data_by_time(pandas_bus)
+    pandas_bus = filter_data_by_time(pandas_bus, marker="bus")
+    pandas_tram = filter_data_by_time(pandas_tram, marker="train")
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        check_rerun = st.checkbox("Live (2s)")
+    with col2:
+        only_bus = st.checkbox("Only BUS", key="only_bus", on_change=ss_flip())
+    with col3:
+        only_tram = st.checkbox("Only TRAM", key="only_tram", on_change=ss_flip())
+
+    # logic to select only BUS or TRAM
+    if only_bus:
+        pandas_all = pandas_bus
+    elif only_tram:
+        pandas_all = pandas_tram
+    else:
+        pandas_all = pd.concat([pandas_bus, pandas_tram], axis=0)
 
     # multiselect batton -> saving selection in session_state
-    st.session_state.selected_bus = st.multiselect(
-        label="Wybierz linie BUS",
-        options=pandas_bus["Lines"].unique(),
-        default=st.session_state.selected_bus,
-    )
+    col1_select, col2_select = st.columns(2)
+    with col1_select:
+        st.session_state.selected_bus_lines = st.multiselect(
+            label="Wybierz linie BUS:",
+            options=np.sort(pandas_bus["Lines"].unique()),
+            default=st.session_state.selected_bus_lines,
+            disabled=st.session_state.only_tram,
+        )
+    with col2_select:
+        st.session_state.selected_tram_lines = st.multiselect(
+            label="Wybierz linie TRAM:",
+            options=np.sort(pandas_tram["Lines"].unique()),
+            default=st.session_state.selected_tram_lines,
+            disabled=st.session_state.only_bus,
+        )
 
-    # use only selected bus lines -> if 0 selected show all markers
-    if len(st.session_state.selected_bus) > 0:
-        pandas_bus = pandas_bus[pandas_bus["Lines"].isin(st.session_state.selected_bus)]
+    # use only selected lines -> if 0 selected show all markers
+    if (len(st.session_state.selected_bus_lines) > 0) or len(
+        st.session_state.selected_tram_lines
+    ) > 0:
+        pandas_all = pandas_all[
+            pandas_all["Lines"].isin(
+                st.session_state.selected_bus_lines
+                + st.session_state.selected_tram_lines
+            )
+        ]
 
     # add markers to state_session
-    markers_done = markers_to_session(pandas_bus)
+    markers_done = markers_to_session(pandas_all, marker_color="black")
 
     # map initialization
     m = folium.Map(location=CENTER_START, zoom_start=8)
@@ -176,8 +263,19 @@ async def main():
     )
     # st.write(map_data)
 
+    st.write(
+        "Liczba pojazdów (wyświetlanych): ",
+        pandas_all.shape[0],
+        " | Liczba BUS: ",
+        pandas_bus.shape[0],
+        " | Liczba TRAM: ",
+        pandas_tram.shape[0],
+    )
+
     # show table with selected items
-    st.write(pandas_bus)
+    # st.write(pandas_bus)
+    # st.write(pandas_tram)
+    # st.write(pandas_all)
 
     ### Sidebar with printed "session_state"
     # with st.sidebar:
