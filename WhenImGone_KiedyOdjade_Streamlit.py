@@ -45,9 +45,9 @@ if "last_api_call" not in st.session_state:
 if "map_refresh_counter" not in st.session_state:
     st.session_state.map_refresh_counter = 0
 if "last_json_bus" not in st.session_state:
-    st.session_state.last_json_bus = {}
+    st.session_state.last_json_bus = 0
 if "last_json_tram" not in st.session_state:
-    st.session_state.last_json_tram = {}
+    st.session_state.last_json_tram = 0
 if "json_errors" not in st.session_state:
     st.session_state.json_errors = 0
 
@@ -68,9 +68,9 @@ def ss_flip():
             st.session_state.only_bus = 0
             st.session_state.only_tram = 0
     elif st.session_state.only_tram:
-        if st.session_state.only_bus:
-            st.session_state.only_bus = 0
-            st.session_state.only_tram = 0
+            if st.session_state.only_bus:
+                st.session_state.only_bus = 0
+                st.session_state.only_tram = 0
 
 
 # get json
@@ -89,7 +89,7 @@ async def fetch(session, url):
 
 
 # convert json to pandas DataFrame + convert "Time" column for future calculation
-@st.cache
+@st.cache_data
 def json_to_pandas(json, last_json, type):
     try:
         pandas_json = pd.json_normalize(json["result"])
@@ -119,8 +119,9 @@ def json_to_pandas(json, last_json, type):
 
 
 # get time and filter data from API
-@st.cache
-def filter_data_by_time(wawa_array, marker="bus"):
+@st.cache_data
+def filter_data_by_time(wawa_array, marker="globe"):
+    # print(wawa_array)
     current_date_and_time = datetime.now()
     wawa_array_filtered = wawa_array.loc[
         wawa_array["Time"] > (current_date_and_time - timedelta(minutes=5))
@@ -134,7 +135,7 @@ def filter_data_by_time(wawa_array, marker="bus"):
 
 
 # add markers to session_state for interactive map
-@st.cache
+@st.cache_data
 def markers_to_session(wawa_array_filtered, marker_color="white"):
     # del st.session_state.markers
     st.session_state.markers = []
