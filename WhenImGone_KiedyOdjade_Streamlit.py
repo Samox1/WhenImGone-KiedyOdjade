@@ -239,7 +239,6 @@ async def main():
     # map initialization
     m = folium.Map(location=CENTER_START, zoom_start=8)
 
-    fg_empty = folium.FeatureGroup(name="Markers")
     fg = folium.FeatureGroup(name="Markers")
     for marker in st.session_state.markers:
         fg.add_child(marker)
@@ -277,7 +276,7 @@ async def main():
     # show table with selected items
     # st.write(pandas_bus)
     # st.write(pandas_tram)
-    # st.write(pandas_all)
+    st.write(pandas_all)
 
     ### Sidebar with printed "session_state"
     # with st.sidebar:
