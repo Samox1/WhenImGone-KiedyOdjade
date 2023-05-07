@@ -191,7 +191,7 @@ async def main():
 
     col1, col2, col3 = st.columns(3)
     with col1:
-        check_rerun = st.checkbox("Live (2s)")
+        check_rerun = st.checkbox("Live (2s)", value=True)
     with col2:
         only_bus = st.checkbox("Only BUS", key="only_bus", on_change=ss_flip())
     with col3:
