@@ -164,9 +164,9 @@ async def main():
     st.title("Kiedy Odjade / When I'm Gone")
 
     # total_stop = st.checkbox("Total Stop")
-    pandas_all  = 0
-    pandas_bus  = 0
-    pandas_tram = 0
+    pandas_all  = pd.DataFrame()
+    pandas_bus  = pd.DataFrame()
+    pandas_tram = pd.DataFrame()
 
     st.session_state.map_refresh_counter += 1
 
