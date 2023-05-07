@@ -7,8 +7,8 @@ Project where you wanna find when bus or tram will arrive or you wanna just look
 #### TODO:
 1. [ ] Streamlit prototype
    1. [x] Realtime BUS tracking
-   2. [ ] Realtime TRAM tracking
-   3. [ ] Panel to select bus/tram lines
+   2. [x] Realtime TRAM tracking
+   3. [x] Panel to select bus/tram lines
    4. [ ] Show path and station for selected lines
 2. [ ] Analyze data
    1. [ ] For selected station check all lines and show nearest buses/trams

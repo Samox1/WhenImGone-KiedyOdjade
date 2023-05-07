@@ -7,6 +7,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 import time
+from config_api import API_KEY
 
 
 # NAZWA = "Kiedy Odjade"
@@ -15,7 +16,7 @@ import time
 # TODO: check "streamlit-server-state" library
 
 
-API_KEY = "641871fa-09f4-4925-8352-260938471590"
+API_KEY = API_KEY
 WAWA_API_BUS_JSON = (
     "https://api.um.warszawa.pl/api/action/busestrams_get/?resource_id=f2e5503e-927d-4ad3-9500-4ab9e55deb59&apikey="
     + API_KEY
@@ -129,7 +130,7 @@ def filter_data_by_time(wawa_array, marker="globe"):
     wawa_time = abs(wawa_array_filtered["Time"] - current_date_and_time)
     wawa_time_string = wawa_time.astype("str").str.split().str[-1]
     wawa_time_string = pd.to_datetime(wawa_time_string)
-    wawa_array_filtered["SinceUpdate"] = wawa_time_string.dt.strftime("%Mm %Ss")
+    wawa_array_filtered["LastUpdate"] = wawa_time_string.dt.strftime("%Mm %Ss")
     wawa_array_filtered["Marker"] = marker
     return wawa_array_filtered
 
@@ -163,8 +164,8 @@ async def main():
     st.title("Kiedy Odjade / When I'm Gone")
 
     # total_stop = st.checkbox("Total Stop")
-    pandas_all = 0
-    pandas_bus = 0
+    pandas_all  = 0
+    pandas_bus  = 0
     pandas_tram = 0
 
     st.session_state.map_refresh_counter += 1
