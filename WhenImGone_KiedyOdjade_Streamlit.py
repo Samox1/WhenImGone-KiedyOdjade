@@ -10,9 +10,9 @@ import time
 from config_api import API_KEY
 
 
-# NAZWA = "Kiedy Odjade"
+# NAZWA = "When I'm Gone / Kiedy Odjade"
 
-# TODO: add automatic "black"
+# TODO: add automatic "black" - file reformat
 # TODO: check "streamlit-server-state" library
 
 
@@ -69,9 +69,9 @@ def ss_flip():
             st.session_state.only_bus = 0
             st.session_state.only_tram = 0
     elif st.session_state.only_tram:
-            if st.session_state.only_bus:
-                st.session_state.only_bus = 0
-                st.session_state.only_tram = 0
+        if st.session_state.only_bus:
+            st.session_state.only_bus = 0
+            st.session_state.only_tram = 0
 
 
 # get json
@@ -79,10 +79,10 @@ async def fetch(session, url):
     try:
         async with session.get(url) as response:
             result = await response.json()
-            print(
-                f"ZTM API call (type='{url[-1]}'): ",
-                datetime.now(),
-            )
+            # print(
+            #     f"ZTM API call (type='{url[-1]}'): ",
+            #     datetime.now(),
+            # )
             st.session_state.last_api_call = datetime.now()
             return result
     except Exception:
@@ -115,7 +115,6 @@ def json_to_pandas(json, last_json, type):
         pandas_json = pd.json_normalize(last_json["result"])
         pandas_json["Time"] = pd.to_datetime(pandas_json["Time"])
         # return (print(pandas_json)) -> {'result': 'Błędna metoda lub parametry wywołania'}
-
     return pandas_json
 
 
@@ -159,13 +158,18 @@ def markers_to_session(wawa_array_filtered, marker_color="white"):
 
 # main with logic
 async def main():
-    st.set_page_config(page_title="Kiedy Odjade", page_icon="🚌")
+    st.set_page_config(page_title="When I'm Gone", page_icon="🚌")
 
-    st.title("Kiedy Odjade / When I'm Gone")
+    st.title("When I'm Gone / Kiedy Odjade")
+    st.write(
+        "Simple geo data visualization of ZTM transportation in Warsaw, data from [api.um.warszawa.pl](api.um.warszawa.pl) | \
+        [Code](https://github.com/Samox1/WhenImGone-KiedyOdjade)"
+    )
+    st.write("")
 
     # total_stop = st.checkbox("Total Stop")
-    pandas_all  = pd.DataFrame()
-    pandas_bus  = pd.DataFrame()
+    pandas_all = pd.DataFrame()
+    pandas_bus = pd.DataFrame()
     pandas_tram = pd.DataFrame()
 
     st.session_state.map_refresh_counter += 1
@@ -181,7 +185,9 @@ async def main():
             st.error("Error")
 
         if data_tram:
-            pandas_tram = json_to_pandas(data_tram, st.session_state.last_json_tram, "tram")
+            pandas_tram = json_to_pandas(
+                data_tram, st.session_state.last_json_tram, "tram"
+            )
         else:
             st.error("Error")
 
@@ -209,14 +215,14 @@ async def main():
     col1_select, col2_select = st.columns(2)
     with col1_select:
         st.session_state.selected_bus_lines = st.multiselect(
-            label="Wybierz linie BUS:",
+            label="Select BUS lines:",
             options=np.sort(pandas_bus["Lines"].unique()),
             default=st.session_state.selected_bus_lines,
             disabled=st.session_state.only_tram,
         )
     with col2_select:
         st.session_state.selected_tram_lines = st.multiselect(
-            label="Wybierz linie TRAM:",
+            label="Select TRAM lines:",
             options=np.sort(pandas_tram["Lines"].unique()),
             default=st.session_state.selected_tram_lines,
             disabled=st.session_state.only_bus,
@@ -265,11 +271,11 @@ async def main():
     # st.write(map_data)
 
     st.write(
-        "Liczba pojazdów (wyświetlanych): ",
+        "Number of vehicles (displayed): ",
         pandas_all.shape[0],
-        " | Liczba BUS: ",
+        " | Number of BUSes: ",
         pandas_bus.shape[0],
-        " | Liczba TRAM: ",
+        " | Number of TRAMs: ",
         pandas_tram.shape[0],
     )
 
