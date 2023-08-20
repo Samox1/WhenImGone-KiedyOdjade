@@ -197,7 +197,7 @@ async def main():
 
     col1, col2, col3 = st.columns(3)
     with col1:
-        check_rerun = st.checkbox("Live (2s)", value=True)
+        check_rerun = st.checkbox("Live (10s)", value=True)
     with col2:
         only_bus = st.checkbox("Only BUS", key="only_bus", on_change=ss_flip())
     with col3:
@@ -245,9 +245,14 @@ async def main():
     # map initialization
     m = folium.Map(location=CENTER_START, zoom_start=8)
 
+
+    
+
     fg = folium.FeatureGroup(name="Markers")
     for marker in st.session_state.markers:
         fg.add_child(marker)
+    
+    
 
     st.write(
         "API last call -> ",
@@ -258,6 +263,8 @@ async def main():
         st.session_state.json_errors,
     )
 
+    start_time = time.perf_counter()
+
     # map render
     map_data = st_folium(
         m,
@@ -267,8 +274,12 @@ async def main():
         feature_group_to_add=fg,
         height=400,
         width=700,
+        returned_objects = []
     )
     # st.write(map_data)
+
+    end_time = time.perf_counter()
+    print(f'*** Add markers to map = {end_time - start_time} ')
 
     st.write(
         "Number of vehicles (displayed): ",
@@ -294,7 +305,7 @@ async def main():
     #     st.stop()
 
     if check_rerun:
-        time.sleep(2)
+        time.sleep(10)
         st.experimental_rerun()
 
 
